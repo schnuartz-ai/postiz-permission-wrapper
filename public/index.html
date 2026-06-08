@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Postiz Wrapper – Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .policy-btn {
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .policy-btn:first-child { border-radius: 6px 0 0 6px; }
+    .policy-btn:last-child  { border-radius: 0 6px 6px 0; }
+    .policy-btn.active-auto    { background:#166534; color:#bbf7d0; border-color:#15803d; }
+    .policy-btn.active-draft   { background:#1e3a5f; color:#93c5fd; border-color:#1d4ed8; }
+    .policy-btn.active-blocked { background:#7f1d1d; color:#fca5a5; border-color:#b91c1c; }
+    .policy-btn:not(.active-auto):not(.active-draft):not(.active-blocked) {
+      background:#1f2937; color:#6b7280; border-color:#374151;
+    }
+    .policy-btn:hover:not(.active-auto):not(.active-draft):not(.active-blocked) {
+      background:#374151; color:#d1d5db;
+    }
+    .plat-twitter  { background:#1d9bf0; }
+    .plat-x        { background:#000; border:1px solid #374151; }
+    .plat-linkedin { background:#0077b5; }
+    .plat-instagram{ background:#e1306c; }
+    .plat-facebook { background:#1877f2; }
+    .plat-tiktok   { background:#010101; border:1px solid #374151; }
+    .plat-youtube  { background:#ff0000; }
+    .plat-threads  { background:#101010; border:1px solid #374151; }
+    .plat-reddit   { background:#ff4500; }
+    .plat-default  { background:#4b5563; }
+    .plat-nostr    { background:#7c3aed; }
+    .plat-mastodon { background:#563acc; }
+    .plat-bluesky  { background:#0085ff; }
+    .plat-pinterest{ background:#e60023; }
+    .plat-slack    { background:#4a154b; }
+    .plat-discord  { background:#5865f2; }
+    .plat-telegram { background:#2aabee; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-200 min-h-screen">
+
+<!-- ── Navbar ────────────────────────────────────────────────────────────── -->
+<nav class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between sticky top-0 z-10">
+  <div class="flex items-center gap-2">
+    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+    <span class="font-semibold text-white">Postiz Permission Wrapper</span>
+  </div>
+  <button id="logoutBtn" class="text-sm text-gray-400 hover:text-white transition-colors px-3 py-1 rounded hover:bg-gray-800">
+    Logout
+  </button>
+</nav>
+
+<!-- ── API-Key Selector Bar ──────────────────────────────────────────────── -->
+<div class="bg-gray-900 border-b border-gray-700 px-6 py-2.5 flex items-center gap-3">
+  <span class="text-xs text-gray-500 uppercase tracking-wide shrink-0">API-Key:</span>
+  <select id="keySelector"
+    class="flex-1 max-w-xs bg-gray-800 text-white text-sm border border-gray-700 rounded-lg px-3 py-1.5
+           focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+    <option value="">Lade…</option>
+  </select>
+  <button id="addKeyBtn"
+    class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors
+           flex items-center gap-1.5 shrink-0">
+    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Neuer Key
+  </button>
+  <div id="keyBadge" class="text-xs text-gray-600 font-mono hidden shrink-0 max-w-[180px] truncate"></div>
+</div>
+
+<!-- ── Tabs ──────────────────────────────────────────────────────────────── -->
+<div class="border-b border-gray-800 bg-gray-900 px-6">
+  <div class="flex gap-0">
+    <button class="tab-btn active-tab py-3 px-4 text-sm font-medium border-b-2 border-indigo-500 text-white" data-tab="channels">
+      Accounts &amp; Berechtigungen
+    </button>
+    <button class="tab-btn py-3 px-4 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200" data-tab="activity">
+      Activity-Log
+    </button>
+    <button class="tab-btn py-3 px-4 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200" data-tab="settings">
+      Einstellungen
+    </button>
+  </div>
+</div>
+
+<main class="max-w-3xl mx-auto px-4 py-6">
+
+  <!-- ── Channels / Accounts ─────────────────────────────────────────────── -->
+  <section id="tab-channels" class="tab-panel">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-5">
+      <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-3">Berechtigung pro Account <span id="channelKeyLabel" class="normal-case text-gray-600"></span></p>
+      <div class="grid grid-cols-3 gap-3 text-sm">
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5 inline-block w-3 h-3 rounded-full bg-green-700 flex-shrink-0"></span>
+          <div>
+            <div class="font-medium text-green-300">Auto</div>
+            <div class="text-gray-400 text-xs">Posts gehen direkt live (jetzt oder geplant).</div>
+          </div>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5 inline-block w-3 h-3 rounded-full bg-blue-800 flex-shrink-0"></span>
+          <div>
+            <div class="font-medium text-blue-300">Draft</div>
+            <div class="text-gray-400 text-xs">Posts werden immer als Entwurf gespeichert.</div>
+          </div>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5 inline-block w-3 h-3 rounded-full bg-red-900 flex-shrink-0"></span>
+          <div>
+            <div class="font-medium text-red-300">Blocked</div>
+            <div class="text-gray-400 text-xs">Requests werden komplett abgelehnt (403).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide">Verbundene Accounts</h2>
+      <button id="refreshChannels" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Aktualisieren
+      </button>
+    </div>
+
+    <div id="channelsContainer">
+      <div class="text-gray-500 text-sm py-6 text-center">Lade Accounts…</div>
+    </div>
+  </section>
+
+  <!-- ── Activity ────────────────────────────────────────────────────────── -->
+  <section id="tab-activity" class="tab-panel hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide">Letzte 50 Requests</h2>
+      <button id="refreshActivity" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Aktualisieren
+      </button>
+    </div>
+    <div class="overflow-x-auto rounded-xl border border-gray-800">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-gray-500 text-xs border-b border-gray-800 bg-gray-900">
+            <th class="py-2 px-4 text-left font-medium">Zeit</th>
+            <th class="py-2 px-4 text-left font-medium">Account-IDs</th>
+            <th class="py-2 px-4 text-left font-medium">Angefragt</th>
+            <th class="py-2 px-4 text-left font-medium">Effektiv</th>
+            <th class="py-2 px-4 text-left font-medium">Grund</th>
+          </tr>
+        </thead>
+        <tbody id="activityBody">
+          <tr><td colspan="5" class="py-6 text-center text-gray-500">Lade…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Settings ────────────────────────────────────────────────────────── -->
+  <section id="tab-settings" class="tab-panel hidden">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-5">Einstellungen</h2>
+
+    <!-- Key Details (per selected key) -->
+    <div id="keyDetailsCard" class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+      <div class="flex items-start justify-between mb-4">
+        <div class="flex-1 min-w-0 mr-3">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-medium text-white" id="keyDetailTitle">API-Key</h3>
+            <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded" id="keyDetailBadge">Bot-Zugang</span>
+          </div>
+          <!-- Editable name -->
+          <div class="flex items-center gap-2 mt-2">
+            <input type="text" id="keyNameInput"
+              class="bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-1.5 text-sm w-full max-w-xs
+                     focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="Key-Name">
+            <button id="saveKeyName"
+              class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+              Umbenennen
+            </button>
+          </div>
+        </div>
+        <button id="deleteKeyBtn"
+          class="text-xs text-red-500 hover:text-red-400 border border-gray-800 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap shrink-0">
+          Key löschen
+        </button>
+      </div>
+
+      <!-- Key value -->
+      <p class="text-xs text-gray-400 mb-2">
+        Im Header mitsenden:
+        <code class="bg-gray-800 px-1.5 py-0.5 rounded text-gray-300 font-mono text-xs">Authorization: Bearer &lt;key&gt;</code>
+      </p>
+      <div class="flex gap-2 items-center mb-4">
+        <code id="keyValueDisplay"
+          class="flex-1 bg-gray-800 px-3 py-2 rounded-lg text-xs font-mono text-gray-300 break-all">
+          Lade…
+        </code>
+        <button id="eye-keyValue" data-secret="keyValue" title="Anzeigen / Verbergen"
+          class="eye-btn text-gray-500 hover:text-gray-300 border border-gray-700 px-2.5 py-2 rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg>
+        </button>
+        <button id="copyKeyValue"
+          class="text-xs text-indigo-400 hover:text-indigo-300 border border-gray-700 px-3 py-2 rounded-lg whitespace-nowrap transition-colors">
+          Kopieren
+        </button>
+      </div>
+
+      <!-- MCP-Server -->
+      <div class="border-t border-gray-800 pt-4">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-xs font-medium text-gray-300">MCP-Server</p>
+          <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded">Claude · ChatGPT · Grok</span>
+        </div>
+        <div class="space-y-2 mb-3">
+          <div class="flex gap-2 items-center">
+            <span class="text-xs text-gray-500 w-14 shrink-0">URL</span>
+            <code id="mcpUrlDisplay"
+              class="flex-1 bg-gray-800 px-3 py-2 rounded-lg text-xs font-mono text-gray-300 break-all select-all">https://postiz.clavastack.com/wrapper/mcp</code>
+            <button id="copyMcpUrl"
+              class="text-xs text-indigo-400 hover:text-indigo-300 border border-gray-700 px-3 py-2 rounded-lg whitespace-nowrap transition-colors">
+              Kopieren
+            </button>
+          </div>
+          <div class="flex gap-2 items-center">
+            <span class="text-xs text-gray-500 w-14 shrink-0">Key</span>
+            <code id="mcpKeyDisplay"
+              class="flex-1 bg-gray-800 px-3 py-2 rounded-lg text-xs font-mono text-gray-300 break-all">Lade…</code>
+            <button id="eye-mcpKey" data-secret="mcpKey" title="Anzeigen / Verbergen"
+              class="eye-btn text-gray-500 hover:text-gray-300 border border-gray-700 px-2.5 py-2 rounded-lg transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg>
+            </button>
+            <button id="copyMcpKey"
+              class="text-xs text-indigo-400 hover:text-indigo-300 border border-gray-700 px-3 py-2 rounded-lg whitespace-nowrap transition-colors">
+              Kopieren
+            </button>
+          </div>
+          <div class="flex gap-2 items-center">
+            <span class="text-xs text-gray-500 w-14 shrink-0 leading-tight">URL<br>+Key</span>
+            <code id="mcpFullUrlDisplay"
+              class="flex-1 bg-gray-800 px-3 py-2 rounded-lg text-xs font-mono text-gray-300 break-all">Lade…</code>
+            <button id="eye-mcpFullUrl" data-secret="mcpFullUrl" title="Anzeigen / Verbergen"
+              class="eye-btn text-gray-500 hover:text-gray-300 border border-gray-700 px-2.5 py-2 rounded-lg transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg>
+            </button>
+            <button id="copyMcpFullUrl"
+              class="text-xs text-emerald-400 hover:text-emerald-300 border border-gray-700 px-3 py-2 rounded-lg whitespace-nowrap transition-colors">
+              Kopieren
+            </button>
+          </div>
+        </div>
+        <p class="text-xs text-gray-600 mb-4">↑ URL+Key wenn der Client nur eine URL eingeben kann (z.&thinsp;B. Grok)</p>
+
+        <!-- OAuth -->
+        <div class="border-t border-gray-800 pt-4">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-xs font-medium text-gray-300">OAuth 2.0 <span class="text-gray-600">(für ChatGPT u.&thinsp;a.)</span></p>
+            <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded">PKCE · kein Secret nötig</span>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">
+            Wenn der MCP-Client OAuth verlangt: diese Werte eintragen, danach wirst du nach dem Admin-Passwort gefragt.
+          </p>
+          <div class="space-y-1.5">
+            <div class="flex gap-2 items-center">
+              <span class="text-xs text-gray-500 w-28 shrink-0">Client ID</span>
+              <code class="flex-1 bg-gray-800 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-300 select-all">postiz-wrapper</code>
+              <button onclick="navigator.clipboard.writeText('postiz-wrapper').then(()=>showToast('Kopiert!'))"
+                class="text-xs text-indigo-400 hover:text-indigo-300 border border-gray-700 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors">Kopieren</button>
+            </div>
+            <div class="flex gap-2 items-center">
+              <span class="text-xs text-gray-500 w-28 shrink-0">Client Secret</span>
+              <code class="flex-1 bg-gray-800 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-500 select-all italic">leer lassen</code>
+              <div class="w-[82px]"></div>
+            </div>
+            <div class="flex gap-2 items-center">
+              <span class="text-xs text-gray-500 w-28 shrink-0">Authorization</span>
+              <code class="flex-1 bg-gray-800 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-300 break-all select-all">https://postiz.clavastack.com/wrapper/oauth/authorize</code>
+              <button onclick="navigator.clipboard.writeText('https://postiz.clavastack.com/wrapper/oauth/authorize').then(()=>showToast('Kopiert!'))"
+                class="text-xs text-indigo-400 hover:text-indigo-300 border border-gray-700 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors">Kopieren</button>
+            </div>
+            <div class="flex gap-2 items-center">
+              <span class="text-xs text-gray-500 w-28 shrink-0">Token</span>
+              <code class="flex-1 bg-gray-800 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-300 break-all select-all">https://postiz.clavastack.com/wrapper/oauth/token</code>
+              <button onclick="navigator.clipboard.writeText('https://postiz.clavastack.com/wrapper/oauth/token').then(()=>showToast('Kopiert!'))"
+                class="text-xs text-indigo-400 hover:text-indigo-300 border border-gray-700 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors">Kopieren</button>
+            </div>
+            <div class="flex gap-2 items-center">
+              <span class="text-xs text-gray-500 w-28 shrink-0">Token Auth</span>
+              <code class="flex-1 bg-gray-800 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-500 select-all italic">none (PKCE only)</code>
+              <div class="w-[82px]"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rotate / danger -->
+      <div class="border-t border-gray-800 pt-4 mt-4">
+        <button id="rotateKeyBtn"
+          class="text-xs text-red-400 hover:text-red-300 border border-gray-800 px-3 py-1.5 rounded-lg transition-colors">
+          Key-Wert neu generieren (alten Key sofort ungültig machen)
+        </button>
+      </div>
+    </div>
+
+    <!-- Global: Postiz API Key -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+      <div class="flex items-start justify-between mb-1">
+        <h3 class="font-medium text-white">Postiz API-Key</h3>
+        <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded">verschlüsselt gespeichert</span>
+      </div>
+      <p class="text-xs text-gray-400 mb-3">
+        Den Key findest du in Postiz unter <strong class="text-gray-300">Settings → API Keys</strong>.
+        Er wird mit AES-256-GCM verschlüsselt in der Datenbank abgelegt.
+      </p>
+      <form id="postizKeyForm" class="flex gap-2">
+        <input type="password" id="postizKeyInput"
+          class="flex-1 bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          placeholder="Postiz API-Key…">
+        <button type="submit"
+          class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+          Speichern
+        </button>
+      </form>
+      <div id="postizKeyMsg" class="hidden mt-2 text-xs"></div>
+      <button id="testPostizKey"
+        class="mt-2 text-xs text-gray-400 hover:text-white border border-gray-700 px-3 py-1.5 rounded-lg transition-colors">
+        Verbindung testen
+      </button>
+      <div id="testPostizMsg" class="hidden mt-2 text-xs"></div>
+    </div>
+
+    <!-- Global: Change Password -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <div class="flex items-start justify-between mb-1">
+        <h3 class="font-medium text-white">Passwort ändern</h3>
+        <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded">Session wird danach beendet</span>
+      </div>
+      <p class="text-xs text-gray-400 mb-3">
+        Mindestens 12 Zeichen. Nach dem Ändern wirst du automatisch ausgeloggt.
+      </p>
+      <form id="changePwForm" class="space-y-2">
+        <input type="password" id="currentPw"
+          class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          placeholder="Aktuelles Passwort" autocomplete="current-password">
+        <input type="password" id="newPw"
+          class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          placeholder="Neues Passwort (min. 12 Zeichen)" autocomplete="new-password">
+        <input type="password" id="confirmPw"
+          class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          placeholder="Neues Passwort bestätigen" autocomplete="new-password">
+        <button type="submit"
+          class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-4 py-2 rounded-lg transition-colors">
+          Passwort ändern
+        </button>
+      </form>
+      <div id="changePwMsg" class="hidden pt-1 text-xs"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Toast ──────────────────────────────────────────────────────────────── -->
+<div id="toast"
+  class="fixed bottom-6 right-6 bg-gray-800 text-white text-sm px-4 py-2 rounded-lg shadow-xl
+         transition-all duration-300 opacity-0 translate-y-2 pointer-events-none z-50">
+</div>
+
+<!-- ── New Key Modal ───────────────────────────────────────────────────────── -->
+<div id="newKeyModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+    <h2 class="font-semibold text-white mb-1">Neuer API-Key</h2>
+    <p class="text-xs text-gray-400 mb-4">Gib dem Key einen Namen, damit du weißt, welcher Client ihn verwendet.</p>
+    <input type="text" id="newKeyNameInput"
+      class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm mb-4
+             focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      placeholder="z.B. Grok, ChatGPT, Hermes-Agent…">
+    <div class="flex gap-2 justify-end">
+      <button id="cancelNewKey"
+        class="text-sm text-gray-400 hover:text-white px-4 py-2 rounded-lg border border-gray-700 transition-colors">
+        Abbrechen
+      </button>
+      <button id="confirmNewKey"
+        class="text-sm bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition-colors">
+        Erstellen
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = '/wrapper';
+
+// ── State ─────────────────────────────────────────────────────────────────
+let allKeys      = [];   // [{ id, name, key_value, created_at }]
+let currentKeyId = null; // currently selected key id
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `fixed bottom-6 right-6 text-sm px-4 py-2 rounded-lg shadow-xl transition-all duration-300 z-50
+    ${isError ? 'bg-red-900 text-red-200' : 'bg-gray-800 text-white'}`;
+  el.style.opacity = '1';
+  el.style.transform = 'translateY(0)';
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(8px)';
+  }, 2500);
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active-tab', 'border-indigo-500', 'text-white');
+      b.classList.add('border-transparent', 'text-gray-400');
+    });
+    btn.classList.add('active-tab', 'border-indigo-500', 'text-white');
+    btn.classList.remove('border-transparent', 'text-gray-400');
+
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+
+    if (btn.dataset.tab === 'channels') loadChannels();
+    if (btn.dataset.tab === 'activity') loadActivity();
+    if (btn.dataset.tab === 'settings') renderKeyDetails();
+  });
+});
+
+// ── Logout ────────────────────────────────────────────────────────────────
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await fetch(`${BASE}/admin/logout`, { method: 'POST' });
+  window.location.href = `${BASE}/admin/login`;
+});
+
+// ── Key Selector ──────────────────────────────────────────────────────────
+async function loadKeys(selectId = null) {
+  try {
+    const res  = await fetch(`${BASE}/admin/api/keys`);
+    const data = await res.json();
+    allKeys    = data.keys || [];
+
+    const sel = document.getElementById('keySelector');
+    sel.innerHTML = allKeys.map(k =>
+      `<option value="${esc(k.id)}">${esc(k.name)}</option>`
+    ).join('');
+
+    if (selectId && allKeys.find(k => k.id === selectId)) {
+      sel.value    = selectId;
+      currentKeyId = selectId;
+    } else if (allKeys.length > 0) {
+      sel.value    = allKeys[0].id;
+      currentKeyId = allKeys[0].id;
+    }
+
+    updateKeyBadge();
+    loadChannels();
+    renderKeyDetails();
+  } catch (err) {
+    showToast('Fehler beim Laden der Keys: ' + err.message, true);
+  }
+}
+
+document.getElementById('keySelector').addEventListener('change', (e) => {
+  currentKeyId = e.target.value;
+  updateKeyBadge();
+  loadChannels();
+  renderKeyDetails();
+});
+
+function currentKey() {
+  return allKeys.find(k => k.id === currentKeyId) || null;
+}
+
+// ── Secret masking ───────────────────────────────────────────────────────
+const revealedSecrets = new Set(); // tracks which secret fields are revealed
+
+const EYE_CLOSED = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg>`;
+const EYE_OPEN   = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>`;
+
+function maskKey(val) {
+  if (!val || val.length < 4) return val;
+  const visible = val.slice(-4);
+  const prefix  = val.indexOf('_') > -1 ? val.slice(0, val.indexOf('_') + 1) : '';
+  return prefix + '•'.repeat(Math.max(8, val.length - prefix.length - 4)) + visible;
+}
+
+function maskUrl(url) {
+  // Mask the key= query param but keep the rest readable
+  return url.replace(/(key=)(wk_[\w]+)/i, (_m, p, k) => p + maskKey(k));
+}
+
+function setSecretField(secretId, val, urlVal) {
+  const el      = document.getElementById(secretId + 'Display');
+  const eyeBtn  = document.getElementById('eye-' + secretId);
+  if (!el) return;
+  const revealed = revealedSecrets.has(secretId);
+  if (secretId === 'mcpFullUrl') {
+    el.textContent = revealed ? urlVal : maskUrl(urlVal);
+  } else {
+    el.textContent = revealed ? val : maskKey(val);
+  }
+  if (eyeBtn) eyeBtn.innerHTML = revealed ? EYE_OPEN : EYE_CLOSED;
+}
+
+// Wire up all eye buttons (after DOM ready)
+document.querySelectorAll('.eye-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const secretId = btn.dataset.secret;
+    if (revealedSecrets.has(secretId)) revealedSecrets.delete(secretId);
+    else revealedSecrets.add(secretId);
+    const key = currentKey();
+    if (key) {
+      const fullUrl = 'https://postiz.clavastack.com/wrapper/mcp?key=' + key.key_value;
+      setSecretField('keyValue',   key.key_value, null);
+      setSecretField('mcpKey',     key.key_value, null);
+      setSecretField('mcpFullUrl', key.key_value, fullUrl);
+    }
+  });
+});
+
+function updateKeyBadge() {
+  const badge = document.getElementById('keyBadge');
+  const key   = currentKey();
+  if (key) {
+    badge.textContent = maskKey(key.key_value);
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+// ── New Key Modal ─────────────────────────────────────────────────────────
+document.getElementById('addKeyBtn').addEventListener('click', () => {
+  document.getElementById('newKeyNameInput').value = '';
+  document.getElementById('newKeyModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('newKeyNameInput').focus(), 50);
+});
+
+document.getElementById('cancelNewKey').addEventListener('click', () => {
+  document.getElementById('newKeyModal').classList.add('hidden');
+});
+
+document.getElementById('newKeyModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+});
+
+document.getElementById('confirmNewKey').addEventListener('click', async () => {
+  const name = document.getElementById('newKeyNameInput').value.trim();
+  if (!name) { showToast('Bitte einen Namen eingeben.', true); return; }
+  try {
+    const res  = await fetch(`${BASE}/admin/api/keys`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Fehler', true); return; }
+    document.getElementById('newKeyModal').classList.add('hidden');
+    showToast(`Key "${name}" erstellt`);
+    await loadKeys(data.key.id);
+  } catch (err) {
+    showToast('Fehler: ' + err.message, true);
+  }
+});
+
+document.getElementById('newKeyNameInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('confirmNewKey').click();
+  if (e.key === 'Escape') document.getElementById('newKeyModal').classList.add('hidden');
+});
+
+// ── Settings: Key Details ─────────────────────────────────────────────────
+function renderKeyDetails() {
+  const key = currentKey();
+  if (!key) return;
+
+  const fullUrl = 'https://postiz.clavastack.com/wrapper/mcp?key=' + key.key_value;
+  document.getElementById('keyNameInput').value = key.name;
+  // Reset reveals when switching keys
+  revealedSecrets.clear();
+  setSecretField('keyValue',   key.key_value, null);
+  setSecretField('mcpKey',     key.key_value, null);
+  setSecretField('mcpFullUrl', key.key_value, fullUrl);
+  document.getElementById('keyDetailTitle').textContent =
+    'API-Key: ' + key.name;
+  document.getElementById('keyDetailBadge').textContent =
+    key.name === 'Default' ? 'Standard' : 'Bot-Zugang';
+  document.getElementById('channelKeyLabel').textContent = '— ' + key.name;
+}
+
+document.getElementById('saveKeyName').addEventListener('click', async () => {
+  const name = document.getElementById('keyNameInput').value.trim();
+  if (!name) { showToast('Name darf nicht leer sein.', true); return; }
+  if (!currentKeyId) return;
+  try {
+    const res = await fetch(`${BASE}/admin/api/keys/${currentKeyId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Fehler', true); return; }
+    // Update local state
+    const k = allKeys.find(k => k.id === currentKeyId);
+    if (k) k.name = name;
+    // Update dropdown option
+    const opt = document.querySelector(`#keySelector option[value="${currentKeyId}"]`);
+    if (opt) opt.textContent = name;
+    renderKeyDetails();
+    showToast('Name gespeichert');
+  } catch (err) {
+    showToast('Fehler: ' + err.message, true);
+  }
+});
+
+document.getElementById('copyKeyValue').addEventListener('click', () => {
+  const key = currentKey();
+  if (key) navigator.clipboard.writeText(key.key_value).then(() => showToast('Key kopiert!'));
+});
+
+document.getElementById('copyMcpUrl').addEventListener('click', () => {
+  navigator.clipboard.writeText('https://postiz.clavastack.com/wrapper/mcp').then(() => showToast('MCP-URL kopiert!'));
+});
+
+document.getElementById('copyMcpKey').addEventListener('click', () => {
+  const key = currentKey();
+  if (key) navigator.clipboard.writeText(key.key_value).then(() => showToast('MCP-Key kopiert!'));
+});
+
+document.getElementById('copyMcpFullUrl').addEventListener('click', () => {
+  const key = currentKey();
+  if (key) {
+    const url = 'https://postiz.clavastack.com/wrapper/mcp?key=' + key.key_value;
+    navigator.clipboard.writeText(url).then(() => showToast('URL mit Key kopiert!'));
+  }
+});
+
+document.getElementById('rotateKeyBtn').addEventListener('click', async () => {
+  if (!currentKeyId) return;
+  const key = currentKey();
+  if (!confirm(`Sicher? Der alte Key für "${key?.name}" wird sofort ungültig. Der Client muss den neuen Key verwenden.`)) return;
+  try {
+    const res  = await fetch(`${BASE}/admin/api/keys/${currentKeyId}/rotate`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Fehler', true); return; }
+    const k = allKeys.find(k => k.id === currentKeyId);
+    if (k) k.key_value = data.key_value;
+    updateKeyBadge();
+    renderKeyDetails();
+    showToast('Neuer Key-Wert generiert');
+  } catch (err) {
+    showToast('Fehler: ' + err.message, true);
+  }
+});
+
+document.getElementById('deleteKeyBtn').addEventListener('click', async () => {
+  if (!currentKeyId) return;
+  const key = currentKey();
+  if (!confirm(`Key "${key?.name}" wirklich löschen? Alle Clients die diesen Key verwenden verlieren sofort den Zugang.`)) return;
+  try {
+    const res  = await fetch(`${BASE}/admin/api/keys/${currentKeyId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Fehler', true); return; }
+    showToast(`Key "${key?.name}" gelöscht`);
+    await loadKeys();
+  } catch (err) {
+    showToast('Fehler: ' + err.message, true);
+  }
+});
+
+// ── Platform display names & order ────────────────────────────────────────
+const PLATFORM_LABELS = {
+  twitter:   'X / Twitter',
+  x:         'X / Twitter',
+  linkedin:  'LinkedIn',
+  instagram: 'Instagram',
+  facebook:  'Facebook',
+  tiktok:    'TikTok',
+  youtube:   'YouTube',
+  threads:   'Threads',
+  reddit:    'Reddit',
+  bluesky:   'Bluesky',
+  mastodon:  'Mastodon',
+  nostr:     'Nostr',
+  pinterest: 'Pinterest',
+  slack:     'Slack',
+  discord:   'Discord',
+  telegram:  'Telegram',
+};
+
+const PLATFORM_ORDER = [
+  'twitter', 'x', 'linkedin', 'instagram', 'facebook', 'tiktok',
+  'youtube', 'threads', 'reddit', 'bluesky', 'mastodon', 'nostr',
+  'pinterest', 'slack', 'discord', 'telegram',
+];
+
+function platKey(type) {
+  return (type || '').toLowerCase().replace(/[^a-z]/g, '');
+}
+
+function platLabel(type) {
+  const k = platKey(type);
+  return PLATFORM_LABELS[k] || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Sonstige');
+}
+
+// ── Channels (per selected key) ───────────────────────────────────────────
+async function loadChannels() {
+  if (!currentKeyId) return;
+  const container = document.getElementById('channelsContainer');
+  container.innerHTML = '<div class="text-gray-500 text-sm py-6 text-center">Lade Accounts…</div>';
+
+  try {
+    const res  = await fetch(`${BASE}/admin/api/keys/${currentKeyId}/channels`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      container.innerHTML = `<div class="bg-red-950 border border-red-900 rounded-xl p-4 text-red-400 text-sm">${esc(data.error || 'Fehler beim Laden')}</div>`;
+      return;
+    }
+
+    const channels = data.channels || [];
+    if (channels.length === 0) {
+      container.innerHTML = '<div class="text-gray-500 text-sm py-6 text-center">Keine Accounts gefunden.</div>';
+      return;
+    }
+
+    // Group by platform
+    const groups = new Map();
+    for (const ch of channels) {
+      const k = platKey(ch.type) || 'other';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(ch);
+    }
+
+    // Sort groups by platform order, unknowns at end
+    const sortedKeys = [...groups.keys()].sort((a, b) => {
+      const ai = PLATFORM_ORDER.indexOf(a);
+      const bi = PLATFORM_ORDER.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+
+    // Merge x/twitter into single group
+    if (groups.has('twitter') && groups.has('x')) {
+      const merged = [...groups.get('twitter'), ...groups.get('x')];
+      groups.set('twitter', merged);
+      groups.delete('x');
+      const xi = sortedKeys.indexOf('x');
+      if (xi > -1) sortedKeys.splice(xi, 1);
+    }
+
+    let html = '';
+    for (const k of sortedKeys) {
+      const list  = groups.get(k);
+      const label = platLabel(list[0].type);
+      const dot   = 'plat-' + k;
+      html += `
+      <div class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-2.5 h-2.5 rounded-full ${dot} flex-shrink-0"></div>
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">${esc(label)}</span>
+          <span class="text-xs text-gray-600">${list.length} Account${list.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="space-y-1.5">${list.map(ch => renderChannel(ch)).join('')}</div>
+      </div>`;
+    }
+
+    container.innerHTML = html;
+
+    // Attach policy button listeners
+    container.querySelectorAll('.policy-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const channelId = btn.dataset.channelId;
+        const policy    = btn.dataset.policy;
+        const name      = btn.dataset.name;
+        await setChannelPolicy(channelId, policy, name);
+      });
+    });
+  } catch (err) {
+    container.innerHTML = `<div class="text-red-400 text-sm py-4">${esc(err.message)}</div>`;
+  }
+}
+
+function renderChannel(ch) {
+  const platClass = 'plat-' + platKey(ch.type);
+  const imgHtml = ch.picture
+    ? `<img src="${esc(ch.picture)}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" onerror="this.style.display='none'">`
+    : `<div class="w-8 h-8 rounded-full flex-shrink-0 ${platClass}"></div>`;
+
+  const display = ch.username ? `${esc(ch.name)} <span class="text-gray-500">@${esc(ch.username)}</span>` : esc(ch.name);
+
+  return `
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+      ${imgHtml}
+      <div class="min-w-0">
+        <div class="text-sm text-white font-medium truncate">${display}</div>
+        <div class="text-xs text-gray-500 font-mono truncate">${esc(ch.id)}</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-0 flex-shrink-0">
+      <button class="policy-btn ${ch.policy === 'auto' ? 'active-auto' : ''}"
+        data-channel-id="${esc(ch.id)}" data-policy="auto" data-name="${esc(ch.name)}">Auto</button>
+      <button class="policy-btn ${ch.policy === 'draft' ? 'active-draft' : ''}"
+        data-channel-id="${esc(ch.id)}" data-policy="draft" data-name="${esc(ch.name)}">Draft</button>
+      <button class="policy-btn ${ch.policy === 'blocked' ? 'active-blocked' : ''}"
+        data-channel-id="${esc(ch.id)}" data-policy="blocked" data-name="${esc(ch.name)}">Blocked</button>
+    </div>
+  </div>`;
+}
+
+async function setChannelPolicy(channelId, policy, channelName) {
+  if (!currentKeyId) return;
+  try {
+    const res = await fetch(`${BASE}/admin/api/keys/${currentKeyId}/channels/${channelId}/policy`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ policy, name: channelName }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Fehler', true); return; }
+    showToast(policy === 'auto' ? 'Auto aktiviert' : policy === 'draft' ? 'Draft aktiviert' : 'Geblockt');
+    // Update button styles without full reload
+    document.querySelectorAll(`[data-channel-id="${channelId}"]`).forEach(btn => {
+      btn.classList.remove('active-auto', 'active-draft', 'active-blocked');
+      if (btn.dataset.policy === policy) btn.classList.add('active-' + policy);
+    });
+  } catch (err) {
+    showToast('Fehler: ' + err.message, true);
+  }
+}
+
+// ── Activity ──────────────────────────────────────────────────────────────
+const TYPE_COLORS = {
+  now:      'bg-green-900 text-green-300',
+  schedule: 'bg-blue-900 text-blue-300',
+  draft:    'bg-gray-800 text-gray-300',
+  blocked:  'bg-red-900 text-red-300',
+  unknown:  'bg-gray-800 text-gray-400',
+};
+const POLICY_COLORS = {
+  auto:              'text-green-400',
+  draft:             'text-blue-400',
+  blocked:           'text-red-400',
+  passthrough:       'text-gray-400',
+  'no-channels-found': 'text-yellow-500',
+};
+
+async function loadActivity() {
+  const tbody = document.getElementById('activityBody');
+  tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-gray-500">Lade…</td></tr>';
+  try {
+    const res  = await fetch(`${BASE}/admin/api/activity`);
+    const data = await res.json();
+    const entries = data.entries || [];
+    if (entries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-gray-500">Keine Einträge.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = entries.map(e => {
+      const d    = new Date(e.timestamp);
+      const time = d.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' });
+      let ids = '–';
+      try {
+        const arr = JSON.parse(e.channel_ids);
+        ids = arr.length ? arr.join(', ') : '–';
+      } catch {}
+      const reqColor = TYPE_COLORS[e.requested_type] || TYPE_COLORS.unknown;
+      const effColor = TYPE_COLORS[e.effective_type] || TYPE_COLORS.unknown;
+      const polColor = POLICY_COLORS[e.policy_applied] || 'text-gray-400';
+      return `<tr class="border-b border-gray-800 hover:bg-gray-900 transition-colors">
+        <td class="py-2.5 px-4 text-gray-400 whitespace-nowrap text-xs">${time}</td>
+        <td class="py-2.5 px-4 font-mono text-xs text-gray-300 max-w-[140px]">
+          <div class="truncate" title="${esc(ids)}">${esc(ids)}</div>
+        </td>
+        <td class="py-2.5 px-4">
+          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium ${reqColor}">${esc(e.requested_type)}</span>
+        </td>
+        <td class="py-2.5 px-4">
+          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium ${effColor}">${esc(e.effective_type)}</span>
+        </td>
+        <td class="py-2.5 px-4 text-xs ${polColor}">${esc(e.policy_applied)}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-red-400 py-4 px-4">${esc(err.message)}</td></tr>`;
+  }
+}
+
+// ── Postiz Key ────────────────────────────────────────────────────────────
+document.getElementById('postizKeyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const key = document.getElementById('postizKeyInput').value.trim();
+  const msg = document.getElementById('postizKeyMsg');
+  if (!key) return;
+  try {
+    const res  = await fetch(`${BASE}/admin/api/postiz-key`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ key }),
+    });
+    const data = await res.json();
+    msg.classList.remove('hidden');
+    if (res.ok) {
+      msg.className = 'mt-2 text-xs text-green-400';
+      msg.textContent = 'Postiz API-Key gespeichert und verschlüsselt.';
+      document.getElementById('postizKeyInput').value = '';
+      showToast('Postiz Key gespeichert');
+    } else {
+      msg.className = 'mt-2 text-xs text-red-400';
+      msg.textContent = data.error || 'Fehler beim Speichern';
+    }
+  } catch (err) {
+    msg.classList.remove('hidden');
+    msg.className = 'mt-2 text-xs text-red-400';
+    msg.textContent = 'Netzwerkfehler: ' + err.message;
+  }
+});
+
+document.getElementById('testPostizKey').addEventListener('click', async () => {
+  const btn = document.getElementById('testPostizKey');
+  const msg = document.getElementById('testPostizMsg');
+  btn.textContent = 'Teste…';
+  btn.disabled = true;
+  msg.classList.add('hidden');
+  try {
+    const res  = await fetch(`${BASE}/admin/api/test-postiz`);
+    const data = await res.json();
+    msg.classList.remove('hidden');
+    if (res.ok) {
+      msg.className = 'mt-2 text-xs text-green-400';
+      msg.textContent = '✓ ' + data.message;
+    } else {
+      msg.className = 'mt-2 text-xs text-red-400';
+      msg.textContent = '✗ ' + data.error;
+    }
+  } catch (err) {
+    msg.classList.remove('hidden');
+    msg.className = 'mt-2 text-xs text-red-400';
+    msg.textContent = 'Netzwerkfehler: ' + err.message;
+  } finally {
+    btn.textContent = 'Verbindung testen';
+    btn.disabled = false;
+  }
+});
+
+// ── Change Password ───────────────────────────────────────────────────────
+document.getElementById('changePwForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const currentPassword = document.getElementById('currentPw').value;
+  const newPassword     = document.getElementById('newPw').value;
+  const confirmPassword = document.getElementById('confirmPw').value;
+  const msg = document.getElementById('changePwMsg');
+  msg.classList.add('hidden');
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    msg.className = 'pt-1 text-xs text-red-400';
+    msg.textContent = 'Alle Felder ausfüllen.';
+    msg.classList.remove('hidden');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    msg.className = 'pt-1 text-xs text-red-400';
+    msg.textContent = 'Neues Passwort und Bestätigung stimmen nicht überein.';
+    msg.classList.remove('hidden');
+    return;
+  }
+  if (newPassword.length < 12) {
+    msg.className = 'pt-1 text-xs text-red-400';
+    msg.textContent = 'Mindestens 12 Zeichen erforderlich.';
+    msg.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const res  = await fetch(`${BASE}/admin/api/change-password`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+    });
+    const data = await res.json();
+    msg.classList.remove('hidden');
+    if (res.ok) {
+      msg.className = 'pt-1 text-xs text-green-400';
+      msg.textContent = 'Passwort geändert. Du wirst in 2 Sekunden ausgeloggt…';
+      document.getElementById('changePwForm').reset();
+      setTimeout(() => { window.location.href = `${BASE}/admin/login`; }, 2000);
+    } else {
+      msg.className = 'pt-1 text-xs text-red-400';
+      msg.textContent = data.error || 'Fehler beim Ändern.';
+    }
+  } catch (err) {
+    msg.classList.remove('hidden');
+    msg.className = 'pt-1 text-xs text-red-400';
+    msg.textContent = 'Netzwerkfehler: ' + err.message;
+  }
+});
+
+// ── Listeners ─────────────────────────────────────────────────────────────
+document.getElementById('refreshChannels').addEventListener('click', loadChannels);
+document.getElementById('refreshActivity').addEventListener('click', loadActivity);
+
+// ── Escape helper ─────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])
+  );
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadKeys();
+</script>
+</body>
+</html>

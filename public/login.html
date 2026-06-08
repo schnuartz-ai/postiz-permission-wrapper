@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Postiz Wrapper – Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-sm">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-xl">
+      <h1 class="text-xl font-semibold text-white mb-1">Postiz Wrapper</h1>
+      <p class="text-gray-400 text-sm mb-6">Admin-Bereich – bitte einloggen</p>
+
+      <form id="loginForm">
+        <label class="block text-sm text-gray-400 mb-1">Passwort</label>
+        <input
+          type="password"
+          id="password"
+          autocomplete="current-password"
+          class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 mb-4
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          placeholder="Admin-Passwort"
+        >
+        <div id="error" class="hidden text-red-400 text-sm mb-4"></div>
+        <button type="submit"
+          class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg
+                 transition-colors duration-150">
+          Einloggen
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const BASE = '/wrapper'; // deployment base path
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = document.getElementById('password').value;
+      const errEl    = document.getElementById('error');
+      errEl.classList.add('hidden');
+      errEl.textContent = '';
+
+      try {
+        const res = await fetch(`${BASE}/admin/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          window.location.href = `${BASE}/admin`;
+        } else {
+          errEl.textContent = data.error || 'Login fehlgeschlagen';
+          errEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errEl.textContent = 'Netzwerkfehler';
+        errEl.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
