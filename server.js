@@ -110,6 +110,54 @@ async function bootstrap() {
   app.use('/', oauthRoutes);
   app.use('/admin', adminRoutes);
 
+
+  // ── /upload  — Multipart file upload, authenticated via Wrapper-Key ──────
+  {
+    const multer = require('multer');
+    const crypto = require('crypto');
+    const path   = require('path');
+    const fs     = require('fs');
+
+    const UPLOAD_DIR  = path.join(__dirname, 'public', 'uploads');
+    const PUBLIC_BASE = 'https://postiz.clavastack.com/wrapper/uploads';
+    const EXT_MAP     = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp' };
+
+    const storage = multer.memoryStorage();
+    const upload  = multer({
+      storage,
+      limits: { fileSize: 20 * 1024 * 1024, files: 10 },
+      fileFilter: (_req, file, cb) => {
+        cb(null, !!EXT_MAP[file.mimetype]);
+      },
+    });
+
+    app.post('/upload', requireWrapperKey, upload.array('files', 10), (req, res) => {
+      if (!req.files || req.files.length === 0)
+        return res.status(400).json({ error: 'Keine Dateien empfangen. Feld: files (multipart/form-data).' });
+
+      fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+      const media_urls = [];
+      const errors     = [];
+
+      for (const file of req.files) {
+        const ext = EXT_MAP[file.mimetype];
+        if (!ext) { errors.push(`${file.originalname}: Typ nicht erlaubt (${file.mimetype})`); continue; }
+        const uid  = crypto.randomBytes(8).toString('hex');
+        const base = (file.originalname || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^.]+$/, '');
+        const name = `${base}_${uid}${ext}`;
+        try {
+          fs.writeFileSync(path.join(UPLOAD_DIR, name), file.buffer);
+          media_urls.push(`${PUBLIC_BASE}/${name}`);
+          console.log('[upload]', name, file.size + 'B');
+        } catch (e) {
+          errors.push(`${file.originalname}: ${e.message}`);
+        }
+      }
+
+      res.json({ media_urls, ...(errors.length ? { errors } : {}) });
+    });
+  }
+
   mountMcpRoutes(app, { requireWrapperKey, proxyToPostiz, applyPolicy, db, apiPrefix: API_PREFIX });
 
   app.post('/public/v1/posts', requireWrapperKey, async (req, res) => {

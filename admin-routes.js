@@ -261,6 +261,89 @@ router.get('/api/activity', requireAdmin, (req, res) => {
   res.json({ entries });
 });
 
+// ── API: Analytics summary ────────────────────────────────────────────────────
+router.get('/api/analytics/summary', requireAdmin, async (req, res) => {
+  const postizKey = db.getPostizApiKey();
+  if (!postizKey)
+    return res.status(503).json({ error: 'Postiz API-Key nicht gesetzt.' });
+
+  const now = new Date();
+  const defaultStart = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()
+  ) - 30 * 86400 * 1000).toISOString();
+  const defaultEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+  const startDate = (req.query.start_date || defaultStart).toString();
+  const endDate   = (req.query.end_date   || defaultEnd).toString();
+
+  try {
+    // Fetch all posts pages (up to 1000)
+    const allPosts = [];
+    let page = 1;
+    const limit = 100;
+    while (true) {
+      const qs = new URLSearchParams({
+        page: String(page), limit: String(limit),
+        startDate, endDate,
+      });
+      const data  = await fetchFromPostiz(`${API_PREFIX}/public/v1/posts?${qs}`, postizKey);
+      const posts = data.posts || [];
+      allPosts.push(...posts);
+      if (posts.length < limit || page >= 10) break;
+      page++;
+    }
+
+    // Aggregations
+    const byState    = {};
+    const byPlatform = {};
+    const byAccount  = {};
+    const byDay      = {};
+
+    for (const post of allPosts) {
+      const state    = post.state || 'UNKNOWN';
+      const platform = post.integration?.providerIdentifier || 'unknown';
+      const accId    = post.integration?.id;
+      const accName  = post.integration?.name || accId || 'Unknown';
+      const accPic   = post.integration?.picture || null;
+
+      byState[state] = (byState[state] || 0) + 1;
+
+      if (!byPlatform[platform]) byPlatform[platform] = { platform, total: 0, published: 0, errors: 0, draft: 0, queue: 0 };
+      byPlatform[platform].total++;
+      if (state === 'PUBLISHED') byPlatform[platform].published++;
+      else if (state === 'ERROR') byPlatform[platform].errors++;
+      else if (state === 'DRAFT')  byPlatform[platform].draft++;
+      else if (state === 'QUEUE')  byPlatform[platform].queue++;
+
+      if (accId) {
+        if (!byAccount[accId]) byAccount[accId] = { id: accId, name: accName, platform, picture: accPic, total: 0, published: 0, errors: 0, draft: 0, queue: 0 };
+        byAccount[accId].total++;
+        if (state === 'PUBLISHED') byAccount[accId].published++;
+        else if (state === 'ERROR') byAccount[accId].errors++;
+        else if (state === 'DRAFT') byAccount[accId].draft++;
+        else if (state === 'QUEUE') byAccount[accId].queue++;
+      }
+
+      const day = (post.publishDate || '').slice(0, 10);
+      if (day) byDay[day] = (byDay[day] || 0) + 1;
+    }
+
+    res.json({
+      period:      { start: startDate, end: endDate },
+      total:       allPosts.length,
+      by_state:    byState,
+      by_platform: Object.values(byPlatform).sort((a, b) => b.total - a.total),
+      by_account:  Object.values(byAccount).sort((a, b) => b.total - a.total),
+      by_day:      Object.entries(byDay)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, count]) => ({ date, count })),
+    });
+  } catch (err) {
+    console.error('[admin] analytics error:', err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fetchFromPostiz(urlPath, apiKey) {
   const base = new URL(POSTIZ_BASE_URL);
