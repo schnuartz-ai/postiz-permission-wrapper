@@ -328,6 +328,8 @@ function mountMcpRoutes(app, { requireWrapperKey, proxyToPostiz, applyPolicy, db
           .describe('Posttext.'),
         type: z.enum(['now', 'schedule', 'draft']).default('now')
           .describe('"now" = sofort, "schedule" = geplant (date erforderlich), "draft" = Entwurf.'),
+        post_type: z.enum(['post', 'story']).default('post')
+          .describe('Nur für Instagram: "post" oder "story" (Standard: "post"). Stories unterstützen nur ein Bild.'),
         date: z.string().optional()
           .describe('ISO-8601 Datum, z.B. "2026-06-19T16:00:00.000Z". Nur bei type="schedule".'),
         media_paths: z.array(z.string()).optional()
@@ -344,7 +346,35 @@ function mountMcpRoutes(app, { requireWrapperKey, proxyToPostiz, applyPolicy, db
         tags: z.array(z.string()).default([]).optional()
           .describe('Optionale Tags.'),
       },
-      async ({ integration_ids, content, type = 'now', date, media_paths, image_urls, short_link = false, tags = [] }) => {
+      async ({ integration_ids, content, type = 'now', post_type = 'post', date, media_paths, image_urls, short_link = false, tags = [] }) => {
+
+        // The public integrations endpoint returns the provider as `identifier`.
+        // Resolve every requested account before uploading media or creating posts.
+        let integrations;
+        try {
+          integrations = await proxy('GET', '/public/v1/integrations', {});
+        } catch (e) {
+          return { isError: true, content: [{ type: 'text', text: JSON.stringify({
+            error: 'Plattformen konnten nicht ermittelt werden: Integrationen sind nicht erreichbar.',
+          }) }] };
+        }
+        if (!Number.isInteger(integrations?.status) || integrations.status < 200 ||
+            integrations.status >= 300 || !Array.isArray(integrations.body)) {
+          return { isError: true, content: [{ type: 'text', text: JSON.stringify({
+            error: 'Plattformen konnten nicht ermittelt werden: Ungültige Antwort der Integrationen.',
+          }) }] };
+        }
+        const providers = new Map(integrations.body
+          .filter(integration => typeof integration?.id === 'string' &&
+            typeof integration.identifier === 'string' && integration.identifier.length > 0)
+          .map(integration => [integration.id, integration.identifier]));
+        const missingIds = integration_ids.filter(id => !providers.has(id));
+        if (missingIds.length > 0) {
+          return { isError: true, content: [{ type: 'text', text: JSON.stringify({
+            error: 'Plattform für mindestens eine Integration nicht gefunden.',
+            integration_ids: missingIds,
+          }) }] };
+        }
 
         // Resolve media_paths → Postiz media objects {id, url}
         let resolvedMedia = [];
@@ -372,11 +402,13 @@ function mountMcpRoutes(app, { requireWrapperKey, proxyToPostiz, applyPolicy, db
           date: effectiveDate,
           shortLink: short_link,
           tags,
-          posts: integration_ids.map(id => ({
-            integration: { id },
-            value,
-            settings: { who_can_reply_post: 'everyone' },
-          })),
+          posts: integration_ids.map(id => {
+            const provider = providers.get(id);
+            const settings = provider === 'instagram' || provider === 'instagram-standalone'
+              ? { __type: provider, post_type }
+              : { who_can_reply_post: 'everyone' };
+            return { integration: { id }, value, settings };
+          }),
         };
 
         const policyResult = applyPolicy(body, '/public/v1/posts', keyId);
